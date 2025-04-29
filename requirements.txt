@@ -1,0 +1,16 @@
+# Screen capture
+mss>=6.1.0
+
+# YOLOv8 and object detection
+ultralytics>=8.0.0
+torch>=1.7.0
+torchvision>=0.8.1
+
+# Image processing
+opencv-python>=4.5.0
+numpy>=1.19.0
+Pillow>=8.0.0
+
+# GUI (Tkinter is included with Python standard library)
+# Optional modernized GUI
+# PyQt5>=5.15.0 

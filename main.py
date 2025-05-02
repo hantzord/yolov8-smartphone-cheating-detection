@@ -48,6 +48,14 @@ class SmartphoneMonitorApp:
         self.display_width = 800  # Default display width
         self.display_height = 450  # Default display height
         
+        # Exclusion zones
+        self.exclusion_zones = []  # List to store all exclusion rectangles [(x1,y1,x2,y2), ...]
+        self.is_selecting_zone = False
+        self.start_x = None
+        self.start_y = None
+        self.current_rectangle = None
+        self.scaled_exclusion_zones = []  # Scaled zones for display
+        
         # Create GUI components - MUST happen before loading the model so we can log messages
         self.create_widgets()
         
@@ -204,6 +212,31 @@ class SmartphoneMonitorApp:
             width=8
         ).pack(side=tk.LEFT)
         
+        # Exclusion area frame
+        exclusion_frame = ttk.LabelFrame(self.main_container, text="Exclusion Area Settings", padding=5)
+        exclusion_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Exclusion area controls
+        ttk.Label(exclusion_frame, text="Select areas to exclude from detection:").pack(side=tk.LEFT, padx=(5, 10))
+        
+        self.select_zone_btn = ttk.Button(
+            exclusion_frame,
+            text="Select Area",
+            command=self.start_exclusion_selection,
+            width=15
+        )
+        self.select_zone_btn.pack(side=tk.LEFT, padx=(0, 5))
+        
+        ttk.Button(
+            exclusion_frame,
+            text="Clear Areas",
+            command=self.clear_exclusion_zones,
+            width=15
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.exclusion_status = ttk.Label(exclusion_frame, text="No exclusion areas defined")
+        self.exclusion_status.pack(side=tk.RIGHT, padx=(0, 10))
+        
         # Content area - split into two panels
         content = ttk.Frame(self.main_container)
         content.pack(fill=tk.BOTH, expand=True)
@@ -274,6 +307,13 @@ class SmartphoneMonitorApp:
         # Log the action
         self.log_message("Monitoring started")
         
+        # Log exclusion zones if defined
+        if self.exclusion_zones:
+            self.log_message(f"Using {len(self.exclusion_zones)} exclusion zone(s):")
+            for i, zone in enumerate(self.exclusion_zones):
+                x1, y1, x2, y2 = zone
+                self.log_message(f"  Zone {i+1}: ({x1},{y1}) to ({x2},{y2})")
+        
         # Start screen capture with our callback
         self.screen_capture.start_capture(callback=self.process_screenshot)
     
@@ -296,10 +336,16 @@ class SmartphoneMonitorApp:
         # Stop screen capture
         self.screen_capture.stop_capture()
         
-        # Close notification if open
+        # Previously we closed notification windows here, but now we'll keep them open
+        # so users can still view alerts after stopping monitoring
+        
+        # If notification window exists, add a message that monitoring has stopped
         if self.notification_window and self.notification_window.winfo_exists():
-            self.notification_window.destroy()
-            self.notification_window = None
+            # Just notify user that monitoring has stopped but keep windows open
+            self.root.after(100, lambda: messagebox.showinfo(
+                "Monitoring Stopped", 
+                "Monitoring has been stopped. All detection alerts will remain open for your review.",
+                parent=self.notification_window))
     
     def update_preview_image(self, image):
         """Update the preview canvas with the latest screenshot and detections"""
@@ -353,6 +399,43 @@ class SmartphoneMonitorApp:
         # Display the image on the canvas
         self.preview_canvas.create_image(x_pos, y_pos, anchor=tk.NW, image=self.tk_image)
         
+        # Draw exclusion zones on the canvas with semi-transparent overlay
+        self.scaled_exclusion_zones = []  # Reset scaled zones
+        for zone in self.exclusion_zones:
+            x1, y1, x2, y2 = zone
+            
+            # Scale coordinates to canvas size
+            x1_canvas = x1 * scale + x_pos
+            y1_canvas = y1 * scale + y_pos
+            x2_canvas = x2 * scale + x_pos
+            y2_canvas = y2 * scale + y_pos
+            
+            # Store scaled coordinates for display
+            self.scaled_exclusion_zones.append((x1_canvas, y1_canvas, x2_canvas, y2_canvas))
+            
+            # Draw zone with red border
+            self.preview_canvas.create_rectangle(
+                x1_canvas, y1_canvas, x2_canvas, y2_canvas,
+                outline="red", width=2
+            )
+            
+            # Draw semi-transparent overlay
+            # Use a polygon with stipple pattern for semi-transparency
+            self.preview_canvas.create_rectangle(
+                x1_canvas, y1_canvas, x2_canvas, y2_canvas,
+                fill="red", stipple="gray50", width=0
+            )
+            
+            # Add "Excluded" text
+            text_x = (x1_canvas + x2_canvas) / 2
+            text_y = (y1_canvas + y2_canvas) / 2
+            self.preview_canvas.create_text(
+                text_x, text_y,
+                text="EXCLUDED",
+                fill="white",
+                font=("Arial", 10, "bold")
+            )
+    
     def process_screenshot(self, screenshot):
         """
         Process a screenshot to detect smartphones
@@ -363,29 +446,57 @@ class SmartphoneMonitorApp:
             return
         
         try:
-            # Detect smartphones in the screenshot
-            smartphones_detected, result_image = self.detector.detect_smartphone(screenshot)
+            # Detect smartphones in the screenshot, kirimkan exclusion zones ke detector
+            smartphones_detected, result_image = self.detector.detect_smartphone(
+                screenshot, 
+                exclusion_zones=self.exclusion_zones if self.exclusion_zones else None
+            )
             
             # Update the preview with detected objects
             self.current_image = result_image
             self.update_preview_image(result_image)
             
-            # If a smartphone is detected, show notification and log it
+            # Only process detections if any smartphones are detected outside exclusion zones
             if smartphones_detected:
-                # Dapatkan informasi deteksi untuk alert
+                # Ada smartphone di luar exclusion zone, tampilkan alert
                 detection_info = self.get_detection_info(result_image)
                 
-                self.log_message("ALERT: Smartphone detected!")
+                self.log_message("ALERT: Smartphone detected outside exclusion zone!")
                 self.show_notification(detection_info)
                 self.notification_shown = True
-                
             # If no smartphone and notification was shown before, just log it but keep notifications open
             elif not smartphones_detected and self.notification_shown:
-                self.log_message("No smartphone detected anymore")
+                self.log_message("No smartphone detected outside exclusion zones")
                 # We don't reset notification_shown or close windows anymore
                 
         except Exception as e:
             self.log_message(f"Error during detection: {e}")
+    
+    def check_detection_in_exclusion_zones(self):
+        """
+        Check if detected objects are within exclusion zones
+        Returns True if ALL detections are in exclusion zones (should be ignored)
+        Returns False if ANY detection is outside exclusion zones (should trigger alert)
+        """
+        # Fungsi ini tidak lagi digunakan karena pengecekan sudah dilakukan di detector
+        # Tetap disimpan untuk backward compatibility
+        if not self.exclusion_zones or not hasattr(self.detector, 'last_detections'):
+            return False
+            
+        # Get the detection boxes from the detector
+        detections = self.detector.last_detections
+        
+        if not detections:
+            return False
+        
+        # Untuk setiap deteksi, periksa apakah berada di dalam exclusion zone
+        for box in detections:
+            # Dapatkan flag in_exclusion_zone (elemen ke-7)
+            if len(box) >= 7 and not box[6]:  # Jika tidak berada di exclusion zone
+                return False
+        
+        # Semua deteksi berada dalam exclusion zone
+        return True
     
     def get_detection_info(self, image):
         """Ekstrak informasi deteksi dari gambar hasil deteksi"""
@@ -660,7 +771,7 @@ class SmartphoneMonitorApp:
             thumb_frame.image = img_tk
             
             # Label untuk menampilkan thumbnail
-            thumb_label = tk.Label(thumb_frame, image=img_tk, bd=0)
+            thumb_label = tk.Label(thumb_frame, image=img_tk, bd=0, cursor="hand2")
             thumb_label.pack(padx=2, pady=2)
             
             # Label caption
@@ -671,6 +782,28 @@ class SmartphoneMonitorApp:
                 bg="white",
                 fg="#666666"
             ).pack()
+            
+            # Store full image for viewing
+            full_image = detection_info['thumbnail'].copy()
+            
+            # Make thumbnail clickable to view full image
+            thumb_label.bind("<Button-1>", lambda e, img=full_image: self.show_full_image(img))
+            
+            # Add View Full Image button
+            view_full_btn = tk.Button(
+                content_frame,
+                text="View Full Image",
+                command=lambda img=full_image: self.show_full_image(img),
+                bg="#2979ff",
+                fg="white",
+                font=("Arial", 10, "bold"),
+                relief=tk.GROOVE,
+                borderwidth=2,
+                padx=10,
+                pady=5,
+                cursor="hand2"
+            )
+            view_full_btn.pack(pady=(0, 15))
         
         # Tombol Close Tab dengan style lebih menarik
         close_tab_btn = tk.Button(
@@ -725,6 +858,66 @@ class SmartphoneMonitorApp:
                 self.notification_window.destroy()
                 self.notification_window = None
     
+    def show_full_image(self, image):
+        """Display the full-sized detection image in a new window"""
+        if image is None:
+            return
+            
+        # Create a new window for the full image
+        full_img_window = tk.Toplevel(self.root)
+        full_img_window.title("Full Detection Image")
+        full_img_window.attributes('-topmost', True)  # Keep on top
+        
+        # Get screen dimensions for sizing the window
+        screen_width = full_img_window.winfo_screenwidth()
+        screen_height = full_img_window.winfo_screenheight()
+        
+        # Set window size to 80% of screen dimensions
+        window_width = int(screen_width * 0.8)
+        window_height = int(screen_height * 0.8)
+        full_img_window.geometry(f"{window_width}x{window_height}")
+        
+        # Convert OpenCV image to PIL and then to PhotoImage
+        h, w = image.shape[:2]
+        
+        # Calculate scale to fit window
+        scale = min(window_width / w, window_height / h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        
+        # Resize the image
+        resized_img = cv2.resize(image, (new_w, new_h))
+        pil_img = Image.fromarray(cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB))
+        img_tk = ImageTk.PhotoImage(pil_img)
+        
+        # Create canvas to display the image
+        canvas = tk.Canvas(full_img_window, width=window_width, height=window_height)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Store reference to prevent garbage collection
+        canvas.image = img_tk
+        
+        # Calculate position to center the image
+        x_pos = (window_width - new_w) // 2
+        y_pos = (window_height - new_h) // 2
+        
+        # Display image on canvas
+        canvas.create_image(x_pos, y_pos, anchor=tk.NW, image=img_tk)
+        
+        # Add close button at the bottom
+        close_btn = tk.Button(
+            full_img_window,
+            text="Close",
+            command=full_img_window.destroy,
+            bg="#ff3333",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            relief=tk.GROOVE,
+            borderwidth=4,
+            padx=15,
+            pady=5
+        )
+        close_btn.pack(pady=10)
+    
     def on_close(self):
         """Cleanup and close the application"""
         if self.is_monitoring:
@@ -766,11 +959,176 @@ class SmartphoneMonitorApp:
         """Reset detection speed to default value (1.5 seconds)"""
         self.speed_value.set(1.5)
         self.update_detection_speed()
+        
+    def start_exclusion_selection(self):
+        """Start the process of selecting an exclusion zone"""
+        if self.is_monitoring:
+            messagebox.showinfo("Warning", "Please stop monitoring before selecting exclusion areas.")
+            return
+        
+        if not self.is_selecting_zone:
+            self.is_selecting_zone = True
+            self.select_zone_btn.config(text="Cancel Selection", style="Red.TButton")
+            self.exclusion_status.config(text="Click and drag to select an area")
+            
+            # Bind mouse events to canvas
+            self.preview_canvas.bind("<ButtonPress-1>", self.on_mouse_down)
+            self.preview_canvas.bind("<B1-Motion>", self.on_mouse_drag)
+            self.preview_canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
+            
+            # Take a screenshot to show on canvas if no current image
+            if self.current_image is None:
+                try:
+                    screenshot = self.screen_capture.capture_screen()
+                    self.current_image = screenshot
+                    self.update_preview_image(screenshot)
+                except Exception as e:
+                    self.log_message(f"Error taking screenshot: {e}")
+        else:
+            self.cancel_exclusion_selection()
+    
+    def cancel_exclusion_selection(self):
+        """Cancel the selection process"""
+        self.is_selecting_zone = False
+        self.select_zone_btn.config(text="Select Area", style="TButton")
+        self.exclusion_status.config(text=f"{len(self.exclusion_zones)} exclusion area(s) defined")
+        
+        # Remove the current rectangle if it exists
+        if self.current_rectangle:
+            self.preview_canvas.delete(self.current_rectangle)
+            self.current_rectangle = None
+            
+        # Unbind mouse events
+        self.preview_canvas.unbind("<ButtonPress-1>")
+        self.preview_canvas.unbind("<B1-Motion>")
+        self.preview_canvas.unbind("<ButtonRelease-1>")
+        
+        # Redraw exclusion zones
+        self.update_preview_image(self.current_image)
+    
+    def on_mouse_down(self, event):
+        """Handle mouse button press for starting rectangle selection"""
+        if not self.is_selecting_zone:
+            return
+            
+        # Record start position
+        self.start_x = event.x
+        self.start_y = event.y
+        
+        # Create a new rectangle
+        self.current_rectangle = self.preview_canvas.create_rectangle(
+            self.start_x, self.start_y, self.start_x, self.start_y,
+            outline="red", width=2, dash=(5, 5)
+        )
+    
+    def on_mouse_drag(self, event):
+        """Handle mouse drag for resizing selection rectangle"""
+        if not self.is_selecting_zone or self.current_rectangle is None:
+            return
+            
+        # Update rectangle size
+        self.preview_canvas.coords(self.current_rectangle, self.start_x, self.start_y, event.x, event.y)
+    
+    def on_mouse_up(self, event):
+        """Handle mouse button release to finalize selection"""
+        if not self.is_selecting_zone or self.current_rectangle is None:
+            return
+            
+        # Get the final coordinates
+        end_x = event.x
+        end_y = event.y
+        
+        # Ensure coordinates are ordered (top-left, bottom-right)
+        x1 = min(self.start_x, end_x)
+        y1 = min(self.start_y, end_y)
+        x2 = max(self.start_x, end_x)
+        y2 = max(self.start_y, end_y)
+        
+        # Check if the rectangle is too small
+        if abs(x2 - x1) < 20 or abs(y2 - y1) < 20:
+            messagebox.showinfo("Warning", "Selection area is too small. Please try again.")
+            self.preview_canvas.delete(self.current_rectangle)
+            self.current_rectangle = None
+            return
+        
+        # Convert canvas coordinates to actual screen coordinates
+        if self.current_image is not None:
+            h, w = self.current_image.shape[:2]
+            canvas_width = self.preview_canvas.winfo_width()
+            canvas_height = self.preview_canvas.winfo_height()
+            
+            # Calculate scale used for display
+            scale_w = canvas_width / w
+            scale_h = canvas_height / h
+            scale = min(scale_w, scale_h)
+            
+            # Calculate offset for centering
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            x_offset = (canvas_width - new_w) // 2
+            y_offset = (canvas_height - new_h) // 2
+            
+            # Adjust coordinates based on scale and offset
+            # Convert from canvas to scaled image coordinates
+            x1_scaled = (x1 - x_offset) / scale if x1 >= x_offset else 0
+            y1_scaled = (y1 - y_offset) / scale if y1 >= y_offset else 0
+            x2_scaled = (x2 - x_offset) / scale if x2 >= x_offset else 0
+            y2_scaled = (y2 - y_offset) / scale if y2 >= y_offset else 0
+            
+            # Ensure coordinates are within image bounds
+            x1_scaled = max(0, min(w, x1_scaled))
+            y1_scaled = max(0, min(h, y1_scaled))
+            x2_scaled = max(0, min(w, x2_scaled))
+            y2_scaled = max(0, min(h, y2_scaled))
+            
+            # Store the actual screen coordinates (make sure they're always in order)
+            x1_final = min(x1_scaled, x2_scaled)
+            y1_final = min(y1_scaled, y2_scaled)
+            x2_final = max(x1_scaled, x2_scaled)
+            y2_final = max(y1_scaled, y2_scaled)
+            
+            # Store as integers
+            self.exclusion_zones.append((
+                int(x1_final), 
+                int(y1_final), 
+                int(x2_final), 
+                int(y2_final)
+            ))
+            
+            # Store the canvas coordinates for display
+            self.scaled_exclusion_zones.append((x1, y1, x2, y2))
+            
+            # Update the status
+            self.exclusion_status.config(text=f"{len(self.exclusion_zones)} exclusion area(s) defined")
+            
+            # Display information about the zone
+            self.log_message(f"Added exclusion zone: ({int(x1_final)},{int(y1_final)}) to ({int(x2_final)},{int(y2_final)})")
+        
+        # Remove temporary rectangle
+        self.preview_canvas.delete(self.current_rectangle)
+        self.current_rectangle = None
+        
+        # Return to normal mode
+        self.cancel_exclusion_selection()
+    
+    def clear_exclusion_zones(self):
+        """Clear all defined exclusion zones"""
+        if self.is_selecting_zone:
+            self.cancel_exclusion_selection()
+            
+        self.exclusion_zones = []
+        self.scaled_exclusion_zones = []
+        self.exclusion_status.config(text="No exclusion areas defined")
+        self.log_message("All exclusion zones cleared")
+        
+        # Redraw preview without zones
+        if self.current_image is not None:
+            self.update_preview_image(self.current_image)
 
 if __name__ == "__main__":
     # Set up model path - FIX THE PATH TO POINT TO PROJECT/MODEL
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(base_dir, "model", "smartphone_detector.pt")
+    model_path = os.path.join(base_dir, "model", "best.pt")
     
     # Fallback to the model in the mobile_yolov8_model/weights directory if it exists
     if not os.path.exists(model_path):

@@ -85,8 +85,8 @@ class SmartphoneMonitorGUI:
         style.configure("Header.TLabel", font=("Arial", 11, "bold"))
         
         # Buttons styles
-        style.configure("Green.TButton", background="#4CAF50", foreground="white")
-        style.configure("Red.TButton", background="#F44336", foreground="white")
+        style.configure("Green.TButton", background="#4CAF50", foreground="black")
+        style.configure("Red.TButton", background="#F44336", foreground="black")
     
     def create_widgets(self):
         """Create all GUI components"""
@@ -140,25 +140,57 @@ class SmartphoneMonitorGUI:
         status_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Start button with improved style
-        self.start_btn = ttk.Button(
+        self.start_btn = tk.Button(
             controls_frame, 
             text="Start Monitoring", 
             command=self.start_monitoring,
-            style="Green.TButton",
-            width=20
+            bg="#4CAF50",
+            fg="black",
+            font=("Arial", 10, "bold"),
+            relief=tk.RAISED,
+            borderwidth=2,
+            width=20,
+            cursor="hand2"
         )
         self.start_btn.pack(side=tk.LEFT, padx=(0, 10), pady=5)
         
         # Stop button with improved style
-        self.stop_btn = ttk.Button(
+        self.stop_btn = tk.Button(
             controls_frame, 
             text="Stop Monitoring", 
             command=self.stop_monitoring,
-            style="Red.TButton",
+            bg="#cccccc",
+            fg="black",
+            font=("Arial", 10, "bold"),
+            relief=tk.RAISED,
+            borderwidth=2,
             width=20,
-            state=tk.DISABLED
+            state=tk.DISABLED,
+            cursor="hand2"
         )
         self.stop_btn.pack(side=tk.LEFT, pady=5)
+        
+        # Add hover effects for buttons
+        def on_start_enter(e):
+            if self.start_btn['state'] != 'disabled':
+                self.start_btn['bg'] = '#45a049'  # Darker green on hover
+        
+        def on_start_leave(e):
+            if self.start_btn['state'] != 'disabled':
+                self.start_btn['bg'] = '#4CAF50'  # Original green
+        
+        def on_stop_enter(e):
+            if self.stop_btn['state'] != 'disabled':
+                self.stop_btn['bg'] = '#da190b'  # Darker red on hover
+        
+        def on_stop_leave(e):
+            if self.stop_btn['state'] != 'disabled':
+                self.stop_btn['bg'] = '#F44336'  # Original red
+        
+        self.start_btn.bind("<Enter>", on_start_enter)
+        self.start_btn.bind("<Leave>", on_start_leave)
+        self.stop_btn.bind("<Enter>", on_stop_enter)
+        self.stop_btn.bind("<Leave>", on_stop_leave)
         
         # Status indicator with better visualization
         ttk.Label(status_frame, text="Status:", font=("Arial", 10, "bold")).pack(side=tk.LEFT)
@@ -335,8 +367,8 @@ class SmartphoneMonitorGUI:
         self.notification_shown = False
         
         # Update buttons
-        self.start_btn.config(state=tk.DISABLED)
-        self.stop_btn.config(state=tk.NORMAL)
+        self.start_btn.config(state=tk.DISABLED, bg="#cccccc")  # Gray when disabled
+        self.stop_btn.config(state=tk.NORMAL, bg="#F44336")  # Red when enabled
         self.status_label.config(text="Monitoring", foreground="green")
         self.status_indicator.config(foreground="green")
         
@@ -361,8 +393,8 @@ class SmartphoneMonitorGUI:
         self.is_monitoring = False
         
         # Update buttons
-        self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
+        self.start_btn.config(state=tk.NORMAL, bg="#4CAF50")  # Green when enabled
+        self.stop_btn.config(state=tk.DISABLED, bg="#cccccc")  # Gray when disabled
         self.status_label.config(text="Not Monitoring", foreground="red")
         self.status_indicator.config(foreground="red")
         

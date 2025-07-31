@@ -50,25 +50,32 @@ class ScreenCapture:
     
     def _capture_loop(self):
         """Main capture loop that runs in a separate thread"""
+
+        # Membuat instance MSS (Multi-Screen Shot) untuk menangkap layar
         with mss.mss() as sct:
+            # Selama aplikasi masih berjalan (_running = True)
             while self._running:
                 try:
+                    # Catat waktu mulai untuk menghitung jeda pengambilan gambar
                     start_time = time.time()
                     
-                    # Capture the entire screen menggunakan instance MSS dari thread ini
+                    # Ambil tampilan seluruh layar (monitor pengguna)
                     monitor = sct.monitors[0]
                     screenshot = sct.grab(monitor)
                     img = np.array(screenshot)
+
+                    # Simpan gambar terakhir yang diambil
                     self.last_screenshot = img
                     
-                    # Call the callback function if provided
+                    # Jika ada fungsi callback yang diberikan, panggil dengan gambar sebagai argumen
                     if self._callback:
                         self._callback(img)
                     
-                    # Calculate sleep time to maintain the desired interval
+                    # Hitung waktu yang telah berlalu dan hitung waktu yang perlu dijeda
                     elapsed = time.time() - start_time
                     sleep_time = max(0, self.capture_interval - elapsed)
-                    time.sleep(sleep_time)
+                    time.sleep(sleep_time) # Jeda sebelum mengambil gambar berikutnya
+                # Jika terjadi error saat pengambilan gambar, tampilkan pesan error dan coba lagi setelah 1 detik
                 except Exception as e:
                     print(f"Error during screen capture: {e}")
                     time.sleep(1)  # Sleep briefly before retrying

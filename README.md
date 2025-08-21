@@ -1,6 +1,6 @@
-# Smartphone Detection Monitor  
+# Smartphone Cheating Detection  
 
-Aplikasi *Smartphone Detection Monitor* merupakan aplikasi desktop berbasis Python yang dirancang untuk melakukan *screen monitoring* secara real-time dengan memanfaatkan model YOLOv8. Aplikasi ini berfungsi untuk mendeteksi keberadaan smartphone pada tangkapan layar yang diambil secara berkala, serta memberikan notifikasi *popup* otomatis apabila objek terdeteksi.  
+Aplikasi *Smartphone Cheating Detection* merupakan aplikasi desktop berbasis Python yang dirancang untuk melakukan *screen monitoring* secara real-time dengan memanfaatkan model YOLOv8. Aplikasi ini berfungsi untuk mendeteksi keberadaan smartphone pada tangkapan layar yang diambil secara berkala, serta memberikan notifikasi *popup* otomatis apabila objek terdeteksi.  
 
 ## Persyaratan  
 

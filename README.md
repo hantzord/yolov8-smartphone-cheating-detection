@@ -1,87 +1,70 @@
-# Smartphone Detection Monitor
+# Smartphone Detection Monitor  
 
-Aplikasi desktop Python yang dapat:
-1. Merekam seluruh layar secara real-time dengan interval refresh 1-2 detik
-2. Menggunakan model YOLOv8 untuk mendeteksi smartphone di dalam tangkapan layar
-3. Menampilkan notifikasi popup ketika smartphone terdeteksi
-4. Menyediakan antarmuka sederhana dengan kontrol pemantauan dan area log
+Aplikasi *Smartphone Detection Monitor* merupakan aplikasi desktop berbasis Python yang dirancang untuk melakukan *screen monitoring* secara real-time dengan memanfaatkan model YOLOv8. Aplikasi ini berfungsi untuk mendeteksi keberadaan smartphone pada tangkapan layar yang diambil secara berkala, serta memberikan notifikasi *popup* otomatis apabila objek terdeteksi.  
 
-## Persyaratan
+## Persyaratan  
 
-- Python 3.8 atau lebih baru
-- Sistem operasi Windows
+- Python 3.8 atau versi lebih baru  
+- Sistem operasi Windows  
 
-## Instalasi
+## Instalasi  
 
-1. Clone atau download repository ini
-2. Buat virtual environment (direkomendasikan):
-   ```
+1. Clone atau unduh repositori ini.  
+2. Buat *virtual environment* (optional):  
+   ```bash
    python -m venv venv
    venv\Scripts\activate
-   ```
-3. Install paket-paket yang diperlukan:
-   ```
+   ```  
+3. Install seluruh pustaka yang diperlukan:  
+   ```bash
    pip install -r requirements.txt
-   ```
+   ```  
 
-## Penggunaan
+## Penggunaan  
 
-1. Pastikan file model YOLOv8 (`best.pt`) berada di direktori `model`
-2. Jalankan aplikasi:
-   ```
+1. Pastikan file model YOLOv8 (`best.pt`) tersedia di folder `model`.  
+2. Jalankan aplikasi melalui perintah:  
+   ```bash
    python app.py
-   ```
-3. Gunakan tombol "Start Monitoring" untuk memulai deteksi
-4. Notifikasi popup akan muncul ketika smartphone terdeteksi
-5. Gunakan tombol "Stop Monitoring" untuk menghentikan deteksi
+   ```  
+3. Gunakan tombol **Start Monitoring** untuk memulai proses pemantauan.  
+4. Apabila smartphone terdeteksi, sistem akan menampilkan notifikasi *popup* secara otomatis.  
+5. Tekan tombol **Stop Monitoring** untuk menghentikan proses pemantauan.  
 
-## Fitur Tambahan
+## Fitur Utama  
 
-1. **Exclusion Zones**: Tentukan area-area di layar yang akan diabaikan oleh detektor.
-   - Gunakan tombol "Select Area" untuk memilih area pada preview layar
-   - Klik dan drag untuk membuat rectangle yang akan diabaikan
-   - Area yang dipilih akan ditandai sebagai zona pengecualian
+1. **Screen Monitoring**  
+   - Melakukan pemantauan layar secara real-time dengan interval ±1–2 detik.  
+   - Hasil deteksi ditampilkan dalam bentuk *bounding box* dan label prediksi.  
 
-2. **Load External Screenshot**: Muat screenshot eksternal untuk memilih area pengecualian.
-   - Berguna untuk memilih area pada aplikasi yang biasanya tertutup saat aplikasi monitor aktif
-   - Gunakan tombol "Load Screenshot" untuk memilih file gambar
-   - Pilih area pengecualian pada gambar yang dimuat
+2. **Exclusion Zones**  
+   - Memungkinkan pengguna menentukan area pada layar yang dikecualikan dari proses deteksi.  
+   - Area yang dipilih dapat disimpan ke dalam file `excluded_areas.json` dan digunakan kembali pada sesi berikutnya.  
 
-3. **Save Zones**: Simpan area pengecualian ke file untuk digunakan kembali di sesi mendatang.
-   - Semua area pengecualian disimpan di file `excluded_areas.json`
+3. **Load External Screenshot**  
+   - Mendukung pemuatan *screenshot* eksternal untuk menentukan zona pengecualian secara manual sebelum monitoring dimulai.  
 
-## Struktur Proyek
+4. **Application Log**  
+   - Mencatat seluruh aktivitas aplikasi secara otomatis, termasuk status monitoring, hasil deteksi, dan perubahan parameter.  
+
+## Struktur Proyek  
 
 ```
 project/
-├── app.py                # File utama untuk menjalankan aplikasi
-├── gui.py                # Implementasi GUI dan komponen UI
+├── app.py                # File utama aplikasi
+├── gui.py                # Implementasi antarmuka aplikasi
 ├── model/
 │   └── best.pt           # Model YOLOv8 untuk deteksi smartphone
 ├── utils/
-│   ├── screen_capture.py # Fungsi-fungsi untuk merekam layar
-│   └── detection.py      # Implementasi deteksi YOLOv8
-├── excluded_areas.json   # Menyimpan area yang dikecualikan dari deteksi
-└── README.md             # File ini
-```
+│   ├── screen_capture.py # Modul untuk menangkap layar
+│   └── detection.py      # Modul deteksi YOLOv8
+├── excluded_areas.json   # File konfigurasi area pengecualian
+└── README.md             # Dokumentasi proyek
+```  
 
-## Perubahan Pada Versi Terbaru
+## Pustaka yang Digunakan  
 
-- Memisahkan GUI dari logika aplikasi untuk kode yang lebih terorganisir
-- Memperbaiki masalah warna pada gambar preview (konversi BGR/RGB)
-- Menambahkan fitur untuk memuat screenshot eksternal
-- Menambahkan fitur untuk menyimpan dan memuat exclusion zones
-
-## Library yang Digunakan
-
-- **Screen Capture**: mss (untuk merekam layar dengan cepat)
-- **Object Detection**: Ultralytics YOLOv8 / torch
-- **GUI**: Tkinter (untuk antarmuka desktop yang ringan)
-- **Image Processing**: OpenCV, Numpy, PIL
-
-## Catatan
-
-- Aplikasi dirancang ringan dan responsif
-- Deteksi terjadi di memori tanpa menyimpan screenshot ke disk
-- Interval rekam yang dapat disesuaikan di class ScreenCapture (default: 1.5 detik)
-- Notifikasi muncul sebagai popup di layar ketika smartphone terdeteksi 
+- **Screen Capture**: `mss`  
+- **Object Detection**: `Ultralytics YOLOv8`, `torch`  
+- **GUI**: `Tkinter`  
+- **Image Processing**: `OpenCV`, `NumPy`, `PIL`  

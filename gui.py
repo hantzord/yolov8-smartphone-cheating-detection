@@ -517,7 +517,7 @@ class SmartphoneMonitorGUI:
     
     def on_resize(self, event):
         """Handle window resize to update the preview canvas"""
-        if hasattr(self, 'preview_canvas') and self.current_image:
+        if hasattr(self, 'preview_canvas') and self.current_image is not None:
             # Only process if it's our main window being resized
             if event.widget == self.root:
                 self.update_preview_image(self.current_image)
